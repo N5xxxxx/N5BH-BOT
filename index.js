@@ -1,117 +1,96 @@
 const { Client, GatewayIntentBits, ChannelType, SlashCommandBuilder, REST, Routes } = require('discord.js');
 const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
 
-const VOICE_CHANNEL_ID = "1401074295022817381";
+const TOKEN = process.env.TOKEN;
 const GUILD_ID = "1367976354104086629";
+const VOICE_CHANNEL_ID = "1401074295022817381";
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMembers
-    ]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMembers
+  ]
 });
 
 const commands = [
-    new SlashCommandBuilder()
-        .setName('send')
-        .setDescription('ارسال رسالة بالخاص')
-        .addMentionableOption(option =>
-            option.setName('target')
-                .setDescription('الشخص او الرتبة')
-                .setRequired(true))
-        .addStringOption(option =>
-            option.setName('message')
-                .setDescription('الرسالة')
-                .setRequired(true))
-].map(command => command.toJSON());
+  new SlashCommandBuilder()
+    .setName("send")
+    .setDescription("ارسال رسالة بالخاص")
+    .addUserOption(option =>
+      option.setName("user")
+      .setDescription("الشخص")
+      .setRequired(true))
+    .addStringOption(option =>
+      option.setName("message")
+      .setDescription("الرسالة")
+      .setRequired(true))
+].map(c => c.toJSON());
 
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 client.once("ready", async () => {
 
-    console.log(`🔥 ${client.user.tag} is online`);
+  console.log(`✅ Logged in as ${client.user.tag}`);
 
-    // تسجيل امر السلاش
-    await rest.put(
-        Routes.applicationGuildCommands(client.user.id, GUILD_ID),
-        { body: commands }
-    );
+  // تسجيل الامر
+  await rest.put(
+    Routes.applicationGuildCommands(client.user.id, GUILD_ID),
+    { body: commands }
+  );
 
-    const guild = client.guilds.cache.get(GUILD_ID);
-    if (!guild) return;
+  console.log("✅ Slash command registered");
 
-    const channel = guild.channels.cache.get(VOICE_CHANNEL_ID);
-    if (!channel || channel.type !== ChannelType.GuildVoice) return;
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) return;
 
-    const existingConnection = getVoiceConnection(guild.id);
+  const channel = guild.channels.cache.get(VOICE_CHANNEL_ID);
+  if (!channel || channel.type !== ChannelType.GuildVoice) return;
 
-    if (!existingConnection) {
-        joinVoiceChannel({
-            channelId: channel.id,
-            guildId: guild.id,
-            adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: true
-        });
+  const connection = getVoiceConnection(guild.id);
 
-        console.log("🎧 Connected to voice channel");
-    }
+  if (!connection) {
+    joinVoiceChannel({
+      channelId: channel.id,
+      guildId: guild.id,
+      adapterCreator: guild.voiceAdapterCreator,
+      selfDeaf: true
+    });
+
+    console.log("🎧 Joined voice channel");
+  }
 
 });
 
-// تنفيذ الامر
 client.on("interactionCreate", async interaction => {
 
-    if (!interaction.isChatInputCommand()) return;
+  if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.commandName === "send") {
+  if (interaction.commandName === "send") {
 
-        const target = interaction.options.getMentionable("target");
-        const message = interaction.options.getString("message");
+    const user = interaction.options.getUser("user");
+    const message = interaction.options.getString("message");
 
-        // لو شخص
-        if (target.user) {
+    try {
 
-            try {
+      await user.send(`${message}\n\n<@${user.id}>`);
 
-                await target.send(`${message}\n\n<@${target.id}>`);
+      await interaction.reply({
+        content: "✅ تم ارسال الرسالة",
+        ephemeral: true
+      });
 
-                await interaction.reply({
-                    content: "✅ تم ارسال الرسالة",
-                    ephemeral: true
-                });
+    } catch {
 
-            } catch {
-
-                await interaction.reply({
-                    content: "❌ ما قدرت ارسل له خاص",
-                    ephemeral: true
-                });
-
-            }
-
-        }
-
-        // لو رتبة
-        if (target.members) {
-
-            target.members.forEach(member => {
-
-                if (!member.user.bot) {
-                    member.send(`${message}\n\n<@${member.id}>`).catch(() => {});
-                }
-
-            });
-
-            await interaction.reply({
-                content: "✅ تم ارسال الرسالة للرتبة",
-                ephemeral: true
-            });
-
-        }
+      await interaction.reply({
+        content: "❌ ما قدرت ارسل له خاص",
+        ephemeral: true
+      });
 
     }
 
+  }
+
 });
 
-client.login(process.env.TOKEN);
+client.login(TOKEN);
