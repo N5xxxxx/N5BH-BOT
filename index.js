@@ -12,15 +12,14 @@ const client = new Client({
     ]
 });
 
-// تسجيل أمر /send
 const commands = [
     new SlashCommandBuilder()
         .setName('send')
         .setDescription('ارسال رسالة بالخاص')
-        .addUserOption(option =>
-            option.setName('user')
-                .setDescription('الشخص')
-                .setRequired(false))
+        .addMentionableOption(option =>
+            option.setName('target')
+                .setDescription('الشخص او الرتبة')
+                .setRequired(true))
         .addStringOption(option =>
             option.setName('message')
                 .setDescription('الرسالة')
@@ -33,6 +32,7 @@ client.once("ready", async () => {
 
     console.log(`🔥 ${client.user.tag} is online`);
 
+    // تسجيل امر السلاش
     await rest.put(
         Routes.applicationGuildCommands(client.user.id, GUILD_ID),
         { body: commands }
@@ -45,6 +45,7 @@ client.once("ready", async () => {
     if (!channel || channel.type !== ChannelType.GuildVoice) return;
 
     const existingConnection = getVoiceConnection(guild.id);
+
     if (!existingConnection) {
         joinVoiceChannel({
             channelId: channel.id,
@@ -52,45 +53,60 @@ client.once("ready", async () => {
             adapterCreator: guild.voiceAdapterCreator,
             selfDeaf: true
         });
+
+        console.log("🎧 Connected to voice channel");
     }
 
 });
 
-// تنفيذ الأمر
+// تنفيذ الامر
 client.on("interactionCreate", async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === "send") {
 
-        const user = interaction.options.getUser("user");
+        const target = interaction.options.getMentionable("target");
         const message = interaction.options.getString("message");
 
-        const guild = interaction.guild;
-
-        // لو حددت شخص
-        if (user) {
+        // لو شخص
+        if (target.user) {
 
             try {
-                await user.send(`${message}\n\n<@${user.id}>`);
-                await interaction.reply({ content: "✅ تم ارسال الرسالة", ephemeral: true });
+
+                await target.send(`${message}\n\n<@${target.id}>`);
+
+                await interaction.reply({
+                    content: "✅ تم ارسال الرسالة",
+                    ephemeral: true
+                });
+
             } catch {
-                await interaction.reply({ content: "❌ ما قدرت ارسل له خاص", ephemeral: true });
+
+                await interaction.reply({
+                    content: "❌ ما قدرت ارسل له خاص",
+                    ephemeral: true
+                });
+
             }
 
-        } 
-        // لو ما حددت شخص (يرسل للكل)
-        else {
+        }
 
-            await guild.members.fetch();
+        // لو رتبة
+        if (target.members) {
 
-            guild.members.cache.forEach(member => {
+            target.members.forEach(member => {
+
                 if (!member.user.bot) {
                     member.send(`${message}\n\n<@${member.id}>`).catch(() => {});
                 }
+
             });
 
-            await interaction.reply({ content: "✅ تم ارسال الرسالة للجميع", ephemeral: true });
+            await interaction.reply({
+                content: "✅ تم ارسال الرسالة للرتبة",
+                ephemeral: true
+            });
 
         }
 
